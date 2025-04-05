@@ -2,6 +2,8 @@ import asyncio
 import aiobotocore.session
 import aiofiles
 import aiofiles.os
+import aiohttp
+import json
 from config import config
 from pathlib import Path
 
@@ -28,10 +30,10 @@ class PostprocessWorker:
 
             # Process the job
             print(f"PostprocessWorker {self.worker_id} processing job: {request_id}")
+            request = await self.request_store.get(request_id)
+            result = await self.response_store.get(request_id)
+
             try:
-                request = await self.request_store.get(request_id)
-                result = await self.response_store.get(request_id)
-                
                 await self.move_assets(request_id, result)
                 await self.upload_assets(request_id, request.input.s3.get_config(), result)
 
@@ -43,7 +45,8 @@ class PostprocessWorker:
                 result.status = "failed"
                 result.message = f"Postprocessing failed: {e}"
                 await self.response_store.set(request_id, result)
-            
+
+            await self.invoke_webhook(request_id, request, result)
             await self.response_store.set(request_id, result)
 
             # Mark the job as complete
@@ -105,7 +108,7 @@ class PostprocessWorker:
     async def upload_file_and_get_url(self, requst_id, s3_client, bucket_name, local_path):
         # Get the file name from the local path
         file_name = f"{requst_id}/{Path(local_path).name}"
-        print (f"uploading {file_name}")
+        print(f"uploading {file_name}")
 
         try:
             # Upload the file
@@ -122,3 +125,29 @@ class PostprocessWorker:
         except Exception as e:
             print(f"Error uploading {local_path}: {e}")
             return None
+
+    async def invoke_webhook(self, request_id, request, result):
+        if not (request.input.webhook and request.input.webhook.url):
+            return
+
+        async with aiohttp.ClientSession() as session:
+            try:
+                print(f"Calling webhook {request.input.webhook.url} ...")
+                data = json.dumps({
+                    "result": {
+                        "images": result.output
+                    },
+                    "extra_params": request.input.webhook.extra_params,
+                    "request_id": request_id,
+                    "success": result.status == "success",
+                    "message": result.message
+                }).encode('utf-8')
+                headers = {
+                    "Content-Type": "application/json"
+                }
+                async with session.post(request.input.webhook.url, data=data, headers=headers) as response:
+                    response_data = await response.text()
+
+                    print(f"Executed webhook with response: {response_data}")
+            except Exception as e:
+                raise aiohttp.ClientError(f"Failed to execute webhook: {e}")

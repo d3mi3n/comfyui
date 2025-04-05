@@ -4,10 +4,10 @@ import os
 import json
 
 class S3Config(BaseModel):
-    access_key_id: str = Field(default="")
-    secret_access_key: str = Field(default="")
-    endpoint_url: str = Field(default="")
-    bucket_name: str = Field(default="")
+    access_key_id: str = Field(default=os.environ.get("S3_ACCESS_KEY_ID", ""))
+    secret_access_key: str = Field(default=os.environ.get("S3_SECRET_ACCESS_KEY", ""))
+    endpoint_url: str = Field(default=os.environ.get("S3_ENDPOINT_URL", ""))
+    bucket_name: str = Field(default=os.environ.get("S3_BUCKET_NAME", ""))
     connect_timeout: int = Field(default=5)
     connect_attempts: int = Field(default=1)
     

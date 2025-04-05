@@ -8,8 +8,8 @@
             "bucket_name": "your-bucket"
         },
         "webhook": {
-            "webhook_url": "your-webhook-url",
-            "webhook_extra_params": {}
+            "url": "your-webhook-url",
+            "extra_params": {}
         },
         "modifiers": {
             
