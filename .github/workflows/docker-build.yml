@@ -40,6 +40,7 @@ jobs:
         name: Env Setter
         run: |
           REPO=${GITHUB_REPOSITORY,,}
+          echo "REPO_NAMESPACE=${REPO%%/*}" >> ${GITHUB_ENV}
           echo "REPO_NAME=${REPO#*/}" >> ${GITHUB_ENV}
       -
         name: Checkout
